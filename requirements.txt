@@ -1,6 +1,6 @@
 torch==2.0.1
-diffusers==0.24.0
-transformers==4.33.0
+diffusers
+transformers
 accelerate==0.23.0
 fastapi==0.103.1
 uvicorn==0.23.2
@@ -8,3 +8,4 @@ pillow==10.0.0
 python-multipart==0.0.6
 safetensors==0.4.0
 xformers==0.0.22
+huggingface-hub==0.25.2
