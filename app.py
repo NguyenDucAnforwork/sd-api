@@ -61,6 +61,12 @@ class TextToImageRequest(BaseModel):
 @app.post("/txt2img")
 async def text_to_image(request: TextToImageRequest):
     try:
+        print(f"Received request: {request.prompt[:50]}...")
+        
+        # Validate that model is loaded
+        if pipe is None:
+            raise HTTPException(status_code=503, detail="Model not loaded yet")
+        
         # Clear GPU cache before generation
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
@@ -73,7 +79,10 @@ async def text_to_image(request: TextToImageRequest):
             
         print(f"Generating image with prompt: {request.prompt[:50]}...")
         
-        # Generate the image
+        # Generate the image with progress callback
+        def progress_callback(step, timestep, latents):
+            print(f"Step {step}/{request.num_inference_steps}")
+        
         image = pipe(
             prompt=request.prompt,
             negative_prompt=request.negative_prompt,
@@ -82,6 +91,8 @@ async def text_to_image(request: TextToImageRequest):
             num_inference_steps=request.num_inference_steps,
             guidance_scale=request.guidance_scale,
             generator=generator,
+            callback=progress_callback,
+            callback_steps=5
         ).images[0]
         
         # Convert to base64
@@ -106,7 +117,19 @@ async def text_to_image(request: TextToImageRequest):
         }
     except Exception as e:
         print(f"Error generating image: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+# Add a simple test endpoint
+@app.get("/")
+async def root():
+    return {"message": "Stable Diffusion API is running!", "endpoints": ["/health", "/txt2img"]}
+
+# Add a quick test endpoint
+@app.post("/test")
+async def test_endpoint():
+    return {"status": "API is working", "message": "Test successful"}
 
 @app.get("/health")
 async def health_check():
