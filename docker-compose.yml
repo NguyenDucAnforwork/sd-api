@@ -1,0 +1,44 @@
+services:
+  sd-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sd-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./generated_images:/app/generated_images
+    environment:
+      - PYTHONPATH=/app
+      - CUDA_VISIBLE_DEVICES=0
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: sd-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+      - ./generated_images:/var/www/html/images
+      - ./web:/var/www/html
+    depends_on:
+      - sd-api
+    restart: unless-stopped
+
+volumes:
+  generated_images:

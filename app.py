@@ -95,16 +95,32 @@ async def text_to_image(request: TextToImageRequest):
             callback_steps=5
         ).images[0]
         
+        # Save image to generated_images folder
+        import datetime
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"generated_{timestamp}.png"
+        image_path = f"/app/generated_images/{filename}"
+        image.save(image_path)
+        
         # Convert to base64
         buffered = io.BytesIO()
         image.save(buffered, format="PNG")
         img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
         
         print("Image generated successfully!")
+        print(f"Image size: {len(img_str)} characters")
+        print(f"Image saved to: {image_path}")
         
         return {
             "status": "success",
             "image": img_str,
+            "image_url": f"/images/{filename}",
+            "image_info": {
+                "format": "PNG",
+                "base64_length": len(img_str),
+                "estimated_size_kb": len(img_str) * 3 // 4 // 1024,
+                "filename": filename
+            },
             "parameters": {
                 "prompt": request.prompt,
                 "negative_prompt": request.negative_prompt,
@@ -119,6 +135,39 @@ async def text_to_image(request: TextToImageRequest):
         print(f"Error generating image: {str(e)}")
         import traceback
         traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Add endpoint to test without returning full image
+@app.post("/txt2img-test")
+async def text_to_image_test(request: TextToImageRequest):
+    try:
+        print(f"TEST: Received request: {request.prompt[:50]}...")
+        
+        if pipe is None:
+            raise HTTPException(status_code=503, detail="Model not loaded yet")
+        
+        # Generate image
+        image = pipe(
+            prompt=request.prompt,
+            negative_prompt=request.negative_prompt,
+            height=request.height,
+            width=request.width,
+            num_inference_steps=request.num_inference_steps,
+            guidance_scale=request.guidance_scale,
+        ).images[0]
+        
+        # Save image locally for verification
+        image.save("/tmp/test_output.png")
+        
+        # Return success without base64 (for testing)
+        return {
+            "status": "success",
+            "message": "Image generated and saved to /tmp/test_output.png",
+            "image_preview": f"data:image/png;base64,{base64.b64encode(image.tobytes())[:100].decode()}...",
+            "parameters": request.dict()
+        }
+    except Exception as e:
+        print(f"Error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # Add a simple test endpoint
@@ -154,4 +203,5 @@ async def health_check():
 if __name__ == "__main__":
     # RunPod typically exposes services on port 8000
     port = int(os.environ.get("PORT", 8000))
+    # Bind to 0.0.0.0 to accept external connections
     uvicorn.run("app:app", host="0.0.0.0", port=port)

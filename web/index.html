@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stable Diffusion API</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; }
+        input, textarea, button { width: 100%; padding: 8px; margin-bottom: 10px; }
+        button { background-color: #007bff; color: white; border: none; cursor: pointer; }
+        button:hover { background-color: #0056b3; }
+        .result { margin-top: 20px; }
+        .error { color: red; }
+        .success { color: green; }
+        img { max-width: 100%; height: auto; }
+    </style>
+</head>
+<body>
+    <h1>Stable Diffusion Image Generator</h1>
+    
+    <form id="generateForm">
+        <div class="form-group">
+            <label for="prompt">Prompt:</label>
+            <textarea id="prompt" rows="3" placeholder="Enter your image prompt..."></textarea>
+        </div>
+        
+        <div class="form-group">
+            <label for="negative_prompt">Negative Prompt:</label>
+            <textarea id="negative_prompt" rows="2" placeholder="Enter negative prompt (optional)..."></textarea>
+        </div>
+        
+        <div class="form-group">
+            <label for="steps">Inference Steps:</label>
+            <input type="number" id="steps" value="20" min="1" max="100">
+        </div>
+        
+        <button type="submit">Generate Image</button>
+    </form>
+    
+    <div class="result" id="result"></div>
+    
+    <script>
+        document.getElementById('generateForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const prompt = document.getElementById('prompt').value;
+            const negative_prompt = document.getElementById('negative_prompt').value;
+            const steps = document.getElementById('steps').value;
+            const result = document.getElementById('result');
+            
+            if (!prompt) {
+                result.innerHTML = '<div class="error">Please enter a prompt</div>';
+                return;
+            }
+            
+            result.innerHTML = '<div>Generating image... Please wait.</div>';
+            
+            try {
+                const response = await fetch('/api/txt2img', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        prompt: prompt,
+                        negative_prompt: negative_prompt,
+                        num_inference_steps: parseInt(steps),
+                        height: 512,
+                        width: 512
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    result.innerHTML = `
+                        <div class="success">Image generated successfully!</div>
+                        <img src="data:image/png;base64,${data.image}" alt="Generated image">
+                        <p>Image URL: <a href="${data.image_url}" target="_blank">${data.image_url}</a></p>
+                    `;
+                } else {
+                    result.innerHTML = `<div class="error">Error: ${data.detail || 'Unknown error'}</div>`;
+                }
+            } catch (error) {
+                result.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        });
+    </script>
+</body>
+</html>
